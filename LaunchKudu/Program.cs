@@ -43,7 +43,8 @@ namespace LaunchKudu
             File.WriteAllText(inputFile, commandText);
 
             var fileName = @"\\reddog\builds\branches\rd_wapd_stable_latest_amd64fre\RDTools\ACISApp\ACISApp.exe";
-            var arguments = string.Format("-AgreeTerms -extension:\"Antares\" -Endpoint:\"Antares {0}\" -InputFile:{1} -OutFile:{2}", siteInfo.webspace.stamp.name, inputFile, outputFile);
+            //var arguments = string.Format("-AgreeTerms -extension:\"Antares\" -Endpoint:\"Antares {0}\" -InputFile:{1} -OutFile:{2}", siteInfo.webspace.stamp.name, inputFile, outputFile);
+            var arguments = string.Format("-AgreeTerms -extension:\"Antares\" -Endpoint:\"Antares {0}\" -InputFile:{1} -OutFile:{2}", "- WAWSPRODSN1 Geomaster", inputFile, outputFile);
 
             Console.WriteLine(DateTime.Now.ToString("s") + ": " + "Run {0} {1}", fileName, arguments);
             var process = CreateProcess(fileName, arguments);
@@ -83,6 +84,12 @@ namespace LaunchKudu
                             break;
                         }
                     }
+                }
+
+                if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                {
+                    Console.WriteLine(File.ReadAllText(outputFile));
+                    return;
                 }
 
                 var scmUri = string.Format("https://{0}:{1}@{2}/basicauth",
