@@ -92,14 +92,19 @@ namespace LaunchKudu
                     return;
                 }
 
+                var hidden = "******";
                 var scmUri = string.Format("https://{0}:{1}@{2}/basicauth",
-                    username, password, siteInfo.hostnames.First(h => h.hostname_type == 1).hostname);
+                    username, hidden, siteInfo.hostnames.First(h => h.hostname_type == 1).hostname);
                 var chrome = Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe");
                 Console.WriteLine(DateTime.Now.ToString("s") + ": \"{0}\" {1}", chrome, scmUri);
                 if (File.Exists(chrome))
                 {
-                    var proc = Process.Start(chrome, scmUri);
+                    var proc = Process.Start(chrome, scmUri.Replace(hidden, password));
                     proc.WaitForExit(5000);
+                }
+                else
+                {
+                    Console.WriteLine(DateTime.Now.ToString("s") + ": Could not fine {0}!", chrome);
                 }
             }
             finally
