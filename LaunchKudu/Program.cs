@@ -43,8 +43,11 @@ namespace LaunchKudu
             File.WriteAllText(inputFile, commandText);
 
             var fileName = @"\\reddog\builds\branches\rd_wapd_stable_latest_amd64fre\RDTools\ACISApp\ACISApp.exe";
-            //var arguments = string.Format("-AgreeTerms -extension:\"Antares\" -Endpoint:\"Antares {0}\" -InputFile:{1} -OutFile:{2}", siteInfo.webspace.stamp.name, inputFile, outputFile);
             var arguments = string.Format("-AgreeTerms -extension:\"Antares\" -Endpoint:\"Antares {0}\" -InputFile:{1} -OutFile:{2}", "- WAWSPRODSN1 Geomaster", inputFile, outputFile);
+            if (siteInfo.name.StartsWith("mawscanary-"))
+            {
+                arguments = string.Format("-AgreeTerms -extension:\"Antares\" -Endpoint:\"Antares {0}\" -InputFile:{1} -OutFile:{2}", siteInfo.webspace.stamp.name, inputFile, outputFile);
+            }
 
             Console.WriteLine(DateTime.Now.ToString("s") + ": " + "Run {0} {1}", fileName, arguments);
             var process = CreateProcess(fileName, arguments);
