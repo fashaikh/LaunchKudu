@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace LaunchKudu
@@ -37,7 +35,7 @@ namespace LaunchKudu
             var inputFile = Path.GetTempFileName();
             var outputFile = Path.GetTempFileName();
             var approvers = Environment.ExpandEnvironmentVariables("%USERNAME%;antst");
-            var commandText = string.Format("RunLimitedUserCommand \"GetWebSiteConfig {0} {1} {2} /WebSystemName:{3}\" \"{4}\" \"1075622\"",
+            var commandText = string.Format("RunLimitedUserCommand \"GetWebSiteConfig {0} {1} {2} /WebSystemName:{3}\" \"{4}\" \"1075622\" \"\"",
                 siteInfo.subscription.name, siteInfo.webspace.name, siteInfo.name, siteInfo.websystem_name, approvers);
             Console.WriteLine(DateTime.Now.ToString("s") + ": " + "Command {0}", commandText);
             File.WriteAllText(inputFile, commandText);
@@ -51,69 +49,81 @@ namespace LaunchKudu
 
             Console.WriteLine(DateTime.Now.ToString("s") + ": " + "Run {0} {1}", fileName, arguments);
             var process = CreateProcess(fileName, arguments);
+            var handler = new DataReceivedEventHandler((sender, e) =>
+            {
+                // Prepend line numbers to each line of the output.
+                if (!String.IsNullOrEmpty(e.Data))
+                {
+                    Console.WriteLine(e.Data);
+                }
+            });
+
+            process.OutputDataReceived += handler;
+            process.ErrorDataReceived += handler;
 
             process.Start();
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
             while (!process.WaitForExit(30000))
             {
                 Console.WriteLine(DateTime.Now.ToString("s") + ": " + "Waiting for ACISApp.exe ...");
             }
 
             process.WaitForExit();
+
             if (process.ExitCode != 0)
             {
                 throw new InvalidOperationException("ACISApp.exe failed with " + process.ExitCode);
             }
 
-            try
+            File.Delete(inputFile);
+
+            string username = null;
+            string password = null;
+            foreach (var line in File.ReadLines(outputFile))
             {
-                string username = null;
-                string password = null;
-                foreach (var line in File.ReadLines(outputFile))
+                var parts = line.Split(':').Select(p => p.Trim()).ToArray();
+                if (parts[0] == "PublishingUsername")
                 {
-                    var parts = line.Split(':').Select(p => p.Trim()).ToArray();
-                    if (parts[0] == "PublishingUsername")
+                    username = parts[1];
+                    if (!string.IsNullOrEmpty(password))
                     {
-                        username = parts[1];
-                        if (!string.IsNullOrEmpty(password))
-                        {
-                            break;
-                        }
-                    }
-                    else if (parts[0] == "PublishingPassword")
-                    {
-                        password = parts[1];
-                        if (!string.IsNullOrEmpty(username))
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
-
-                if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                else if (parts[0] == "PublishingPassword")
                 {
-                    Console.WriteLine(File.ReadAllText(outputFile));
-                    return;
-                }
-
-                var hidden = "******";
-                var scmUri = string.Format("https://{0}:{1}@{2}/basicauth",
-                    username, hidden, siteInfo.hostnames.First(h => h.hostname_type == 1).hostname);
-                var chrome = Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe");
-                Console.WriteLine(DateTime.Now.ToString("s") + ": \"{0}\" {1}", chrome, scmUri);
-                if (File.Exists(chrome))
-                {
-                    var proc = Process.Start(chrome, scmUri.Replace(hidden, password));
-                    proc.WaitForExit(5000);
-                }
-                else
-                {
-                    Console.WriteLine(DateTime.Now.ToString("s") + ": Could not fine {0}!", chrome);
+                    password = parts[1];
+                    if (!string.IsNullOrEmpty(username))
+                    {
+                        break;
+                    }
                 }
             }
-            finally
+
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
-                File.Delete(inputFile);
-                File.Delete(outputFile);
+                Console.WriteLine(File.ReadAllText(outputFile));
+                return;
+            }
+
+            File.Delete(outputFile);
+
+            var hidden = "******";
+            var scmUri = string.Format("https://{0}:{1}@{2}/basicauth",
+                username, hidden, siteInfo.hostnames.First(h => h.hostname_type == 1).hostname);
+            var chrome = Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe");
+            Console.WriteLine(DateTime.Now.ToString("s") + ": \"{0}\" {1}", chrome, scmUri);
+            if (File.Exists(chrome))
+            {
+                var proc = Process.Start(chrome, scmUri.Replace(hidden, password));
+                proc.WaitForExit(5000);
+            }
+            else
+            {
+                Console.WriteLine(DateTime.Now.ToString("s") + ": Could not fine {0}!", chrome);
             }
         }
 
@@ -126,6 +136,8 @@ namespace LaunchKudu
                 WindowStyle = ProcessWindowStyle.Hidden,
                 UseShellExecute = false,
                 ErrorDialog = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 Arguments = arguments
             };
 
