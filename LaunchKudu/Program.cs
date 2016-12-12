@@ -14,16 +14,38 @@ namespace LaunchKudu
             if (args.Length == 0)
             {
                 Console.WriteLine("usage: LaunchKudu.exe <siteName>");
+                Console.WriteLine("usage: LaunchKudu.exe jitaccess");
                 return;
             }
 
             try
             {
-                Run(args[0]);
+                if (string.Equals(args[0], "jitaccess", StringComparison.OrdinalIgnoreCase))
+                {
+                    GetJitAccess();
+                }
+                else
+                {
+                    Run(args[0]);
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
+                Console.WriteLine(DateTime.Now.ToString("s") + ": " + "To get jitaccess, \"LaunchKudu.exe jitaccess\"");
+                Console.WriteLine(DateTime.Now.ToString("s") + ": " + "Warning pin password not supported!");
+            }
+        }
+
+        static void GetJitAccess()
+        {
+            const string JitAccessUri = "https://jitaccess.security.core.windows.net/WorkFlowTempAccess.aspx?View=Submit&WorkItemSource=IcM&WorkItemId=22748709&Justification=Investigation&ResourceType=ACIS&AccessLevel=PlatformServiceAdministrator&Scope=Antares";
+            var chrome = Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe");
+            Console.WriteLine(DateTime.Now.ToString("s") + ": \"{0}\" {1}", chrome, JitAccessUri);
+            if (File.Exists(chrome))
+            {
+                var proc = Process.Start(chrome, JitAccessUri);
+                proc.WaitForExit(5000);
             }
         }
 
