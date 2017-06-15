@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -9,24 +10,34 @@ namespace LaunchKudu
 {
     class Program
     {
+        static string incident = String.Empty;
         static void Main(string[] args)
         {
+
             if (args.Length == 0)
             {
-                Console.WriteLine("usage: LaunchKudu.exe <siteName>");
-                Console.WriteLine("usage: LaunchKudu.exe jitaccess");
+                Console.WriteLine("usage: LaunchKudu.exe <siteName> <optional ICM incident>");
+                Console.WriteLine("usage: LaunchKudu.exe jitaccess <optional ICM incident>");
                 return;
             }
 
             try
             {
+                if (args.Length >= 2)
+                {
+                    incident = args[1];
+                }
+                else
+                {
+                    incident = GetICMIncident(); 
+                }
                 if (string.Equals(args[0], "jitaccess", StringComparison.OrdinalIgnoreCase))
                 {
                     GetJitAccess();
                 }
                 else
                 {
-                    Run(args[0]);
+                    Run(args[0]).GetAwaiter().GetResult();
                 }
             }
             catch (Exception ex)
@@ -36,10 +47,14 @@ namespace LaunchKudu
                 Console.WriteLine(DateTime.Now.ToString("s") + ": " + "Warning pin password not supported!");
             }
         }
-
+        static string GetICMIncident()
+        {
+            //TODO:Grab one from ICM
+            return "22748709";
+        }
         static void GetJitAccess()
         {
-            const string JitAccessUri = "https://jitaccess.security.core.windows.net/WorkFlowTempAccess.aspx?View=Submit&WorkItemSource=IcM&WorkItemId=22748709&Justification=Investigation&ResourceType=ACIS&AccessLevel=PlatformServiceAdministrator&Scope=Antares";
+            string JitAccessUri = "https://jitaccess.security.core.windows.net/WorkFlowTempAccess.aspx?View=Submit&WorkItemSource=IcM&WorkItemId="+incident+"Justification=Investigation&ResourceType=ACIS&AccessLevel=PlatformServiceAdministrator&Scope=Antares";
             var chrome = Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe");
             Console.WriteLine(DateTime.Now.ToString("s") + ": \"{0}\" {1}", chrome, JitAccessUri);
             if (File.Exists(chrome))
@@ -49,10 +64,10 @@ namespace LaunchKudu
             }
         }
 
-        static void Run(string siteName)
+        static async Task Run(string siteName)
         {
             Console.WriteLine(DateTime.Now.ToString("s") + ": " + "Get site info");
-            var siteInfo = GetSiteInfo(siteName).Result;
+            var siteInfo = await GetSiteInfo(siteName);
 
             var inputFile = Path.GetTempFileName();
             var outputFile = Path.GetTempFileName();
@@ -171,14 +186,14 @@ namespace LaunchKudu
 
         static async Task<SiteInfo> GetSiteInfo(string siteName)
         {
-            HttpClientHandler handler = new HttpClientHandler()
-            {
-                UseDefaultCredentials = true
-            };
+            var authResult = await EasyAuth.AccessToken();
 
-            using (var client = new HttpClient(handler))
+            using (var client = new HttpClient())
             {
-                using (var response = await client.GetAsync("https://observer/api/Sites/" + siteName))
+                string authHeader = authResult.CreateAuthorizationHeader();
+                client.DefaultRequestHeaders.Add("Authorization", authHeader);
+
+                using (var response = await client.GetAsync("https://wawsobserver.azurewebsites.net/api/Sites/" + siteName))
                 {
                     response.EnsureSuccessStatusCode();
                     var result = await response.Content.ReadAsAsync<SiteInfo[]>();
